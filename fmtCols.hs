@@ -36,6 +36,7 @@ defOpts = Opts
        , files = [] &= args &= typFile
        } &= help "Format a tab (or comma) separated file"
          &= program "fmtCols"
+         &= summary "fmtCols V1.0, (C) David R. Powell"
          &= helpArg [explicit, name "h", name "help"]
 
 main = do
