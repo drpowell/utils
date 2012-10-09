@@ -11,17 +11,22 @@ import qualified Data.Map as M
 import Debug.Trace
 import Text.Printf
 import Text.Regex.PCRE
+import Control.Monad.State
 import System.Console.CmdArgs hiding (typ)
 
 data Options = Options { stats :: Bool
                        , overlapping_cds :: Bool
+                       , update_ids :: Maybe FilePath
+                       , feature_prefix :: String
                        , files :: [FilePath]
                        } deriving (Show,Eq,Data,Typeable)
 
 options :: Options
 options = Options
-          { stats = True
-          , overlapping_cds = False
+          { stats = True &= help "Output some stats about the GFF and its features"
+          , overlapping_cds = False &= help "Check if there are any overlapping CDS features"
+          , update_ids = Nothing &= help "Rename all feature IDs in the GFF"
+          , feature_prefix = "FID_" &= help "Prefix to use when renaming all feature IDs"
           , files = [] &= args &= typFile
           }
 
@@ -60,7 +65,13 @@ featureToLine f = intercalate "\t" $ map ($f) [seq_id, source, typ, show.start, 
       mapToAttrib mp = intercalate ";" $ map (\(k,vs) -> concatMap (\v -> k++"="++v) vs) $ M.toList mp
 
 featId :: Feature -> String
-featId f = maybe "" head $ M.lookup "ID" $ attributes f
+featId f = featAttrib "ID" f
+
+featAttrib :: String -> Feature -> String
+featAttrib k f = maybe "" head $ M.lookup k $ attributes f
+
+setFeatAttrib :: String -> Feature -> String -> Feature
+setFeatAttrib k f v = f { attributes = M.insert k [v] (attributes f) }
 
 parseScaffold :: [String] -> (Scaffold, [String])
 parseScaffold (l:ls) = let name = tail (dropWhile (' ' /=) l)
@@ -186,6 +197,31 @@ prSeqStats dna = do
   let [a,t,g,c,n] = map (\c -> fromMaybe (0::Int) . lookup c $ counts) "ATGCN"
   printf "Total=%sbp Ns=%d G+C=%.1f%%\n" (formatInt tot) n (100 * avg (g+c) (a+t+g+c))
 
+-- | Renumber all features that already have an ID.
+setFeatureIDs :: String -> GFF -> GFF
+setFeatureIDs pre gff =
+    let (fs,state) = runState (mapM (updateFeatId "ID" nextId) $ features gff) (1, M.empty)
+        fs' = evalState (mapM (updateFeatId "Parent" missingId) fs) state
+    in gff { features = fs' }
+  where
+    missingId id = error $ "ID missing : "++show id
+
+    nextId :: String -> State (Int, M.Map String String) String
+    nextId id = do (int, mp) <- get
+                   let id' = pre ++ printf "%05d" int++"0"
+                   put (int+1, M.insert id id' mp)
+                   return id'
+
+    updateFeatId :: String -> (String -> State (Int, M.Map String String) String) -> Feature
+                 -> State (Int, M.Map String String) Feature
+    updateFeatId fld no_id f = do (int, mp) <- get
+                                  case featAttrib fld f of
+                                    "" -> return f
+                                    v -> case M.lookup v mp of
+                                           Just v' -> return $ setFeatAttrib fld f v'
+                                           Nothing -> do v' <- no_id v
+                                                         return $ setFeatAttrib fld f v'
+
 grpBy :: Ord k => (a -> k) -> [a] -> [[a]]
 grpBy f ls = grpBy' (Just . f) ls
 
@@ -201,7 +237,7 @@ formatInt x = h++t
 
 
 stdinOrFiles :: Options -> IO String
-stdinOrFiles opts | null (files opts) = getContents
+stdinOrFiles opts | null (files opts) = putStrLn "Reading from stdin..." >> getContents
                   | otherwise = concat <$> mapM readFile (files opts)
 
 main = do
@@ -214,3 +250,7 @@ main = do
   when (stats opts) $ prStats gff
   when (overlapping_cds opts) $ overlappingCDS gff
 
+  case update_ids opts of
+    Nothing -> return ()
+    Just outFile -> do putStrLn $ "Writing to file : "++outFile
+                       writeFile outFile . unlines . gffOutput . setFeatureIDs (feature_prefix opts) $ gff
