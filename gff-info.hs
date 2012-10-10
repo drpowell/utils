@@ -2,6 +2,13 @@
 
 {-# LANGUAGE DeriveDataTypeable,TupleSections #-}
 
+{-
+  Reference for GFF3 : http://www.sequenceontology.org/gff3.shtml
+  Reference for GFF2 : http://www.sanger.ac.uk/resources/software/gff/spec.html#t_2
+-}
+
+
+
 import Control.Monad
 import Control.Applicative
 import Data.Maybe
@@ -13,20 +20,25 @@ import Text.Printf
 import Text.Regex.PCRE
 import Control.Monad.State
 import System.Console.CmdArgs hiding (typ)
+import System.IO
 
 data Options = Options { stats :: Bool
-                       , overlapping_cds :: Bool
-                       , update_ids :: Maybe FilePath
+                       , cds_overlap :: Bool
+                       , out :: Maybe FilePath
+                       , update_ids :: Bool
                        , feature_prefix :: String
+                       , remove_contigs :: [String]
                        , files :: [FilePath]
                        } deriving (Show,Eq,Data,Typeable)
 
 options :: Options
 options = Options
           { stats = True &= help "Output some stats about the GFF and its features"
-          , overlapping_cds = False &= help "Check if there are any overlapping CDS features"
-          , update_ids = Nothing &= help "Rename all feature IDs in the GFF"
+          , cds_overlap = False &= help "Check if there are any overlapping CDS features"
+          , out = Nothing &= help "Write GFF output to this file"
+          , update_ids = False &= help "Rename all feature IDs in the GFF"
           , feature_prefix = "FID_" &= help "Prefix to use when renaming all feature IDs"
+          , remove_contigs = [] &= help "Remove these contigs (space separate contig names)"
           , files = [] &= args &= typFile
           }
 
@@ -186,8 +198,10 @@ prFeatStats gff fs = do
 
 prSummary :: [Int] -> IO ()
 prSummary nums =
-  printf "Num=%s avg=%.1fbp min=%sbp max=%sbp\n" (formatInt $ length nums)
-             (avg (sum nums) (length nums)) (formatInt $ minimum nums) (formatInt $ maximum nums)
+  let sorted = sort nums
+      n50    = sorted!!(length $ takeWhile ((sum nums `div` 2)>) $ scanl1 (+) sorted)
+  in printf "Num=%s avg=%.1fbp min=%sbp max=%sbp n50=%sbp\n" (formatInt $ length nums)
+               (avg (sum nums) (length nums)) (formatInt $ minimum nums) (formatInt $ maximum nums) (formatInt n50)
 
 prSeqStats :: String -> IO ()
 prSeqStats dna = do
@@ -222,6 +236,12 @@ setFeatureIDs pre gff =
                                            Nothing -> do v' <- no_id v
                                                          return $ setFeatAttrib fld f v'
 
+
+removeContigs contigs gff = gff { scaffolds = clean_scaffolds, features = clean_features }
+    where
+      clean_scaffolds = filter (\s -> s_name s `notElem` contigs) $ scaffolds gff
+      clean_features = filter (\f -> seq_id f `notElem` contigs) $ features gff
+
 grpBy :: Ord k => (a -> k) -> [a] -> [[a]]
 grpBy f ls = grpBy' (Just . f) ls
 
@@ -240,17 +260,24 @@ stdinOrFiles :: Options -> IO String
 stdinOrFiles opts | null (files opts) = putStrLn "Reading from stdin..." >> getContents
                   | otherwise = concat <$> mapM readFile (files opts)
 
+withStdoutOrFile Nothing a        = a stdout
+withStdoutOrFile (Just outFile) a = withFile outFile WriteMode (\h -> putStrLn ("Writing to file : "++outFile) >> a h)
+
 main = do
   opts <- cmdArgs options
   ls <- lines <$> stdinOrFiles opts
 
-  let gff = parseGff ls
+  when (not . null . remove_contigs $ opts) $
+    printf "Removing the following contigs : %s\n" (show $ remove_contigs opts)
+  let origGff = parseGff ls
+  let gff = foldl' (\g f -> f g) origGff [if update_ids opts then setFeatureIDs (feature_prefix opts) else id
+                                         ,case remove_contigs opts of {[] -> id ; cs -> removeContigs cs}
+                                         ]
   -- print . featSeq gff . head . features $ gff
 
   when (stats opts) $ prStats gff
-  when (overlapping_cds opts) $ overlappingCDS gff
+  when (cds_overlap opts) $ overlappingCDS gff
 
-  case update_ids opts of
+  case out opts of
     Nothing -> return ()
-    Just outFile -> do putStrLn $ "Writing to file : "++outFile
-                       writeFile outFile . unlines . gffOutput . setFeatureIDs (feature_prefix opts) $ gff
+    Just file -> writeFile file . unlines . gffOutput $ gff
