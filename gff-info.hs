@@ -35,7 +35,7 @@ data Options = Stats     { file :: Maybe FilePath }
 
 --argFile = Nothing &= args &= typFile
 
-optStats    = Stats     { file = Nothing &= typFile &= args } &= help "Output some stats about the GFF and its features"
+optStats    = Stats     { file = Nothing &= typFile &= args } &= help "Output some stats about the GFF and its features" &= auto
 optCdsCheck = CDS_Check { file = Nothing &= typFile &= args } &= help "Check if there are any overlapping CDS features"
 optProcess  = Process { file = Nothing &= typFile &= args
                       , out = Nothing &= help "Write GFF output to this file" &= typFile
@@ -93,11 +93,19 @@ parseScaffold (l:ls) = let name = tail (dropWhile (' ' /=) l)
                            (dnaLines,rest) = break ("##end-DNA" `isPrefixOf`) ls
                        in (Scaffold {s_name = name, dna = concatMap (drop 2) dnaLines}
                           , rest)
+parseFastaScaffolds :: [String] -> [Scaffold]
+parseFastaScaffolds ls
+    | null ls = []
+    | ">" `isPrefixOf` head ls = let (dna,rest) = break (">" `isPrefixOf`) (tail ls)
+                                 in Scaffold {s_name = tail (head ls), dna = concat dna}
+                                        : parseFastaScaffolds rest
+    | otherwise = error $ "Bad FASTA section : "++show (take 5 ls)
 
 parseLines :: [String] -> GFF
 parseLines [] = GFF [] []
 parseLines lss@(l:ls)
     | "##DNA " `isPrefixOf` l = let (s,rem) = parseScaffold lss in addScaffold s (parseLines rem)
+    | "##FASTA" == l          = GFF (parseFastaScaffolds ls) []
     | "##" `isPrefixOf` l     = parseLines ls
     | otherwise               = addFeature (lineToFeature l) (parseLines ls)
   where
