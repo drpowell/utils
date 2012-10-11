@@ -44,7 +44,8 @@ modeCompletion mode = ["_arguments -C -S -s : \\"]
 zsh prog mode = hdr ++
                 case fromGroup $ modeGroupModes mode of
                   [] -> modeCompletion mode
-                  modes -> ["_arguments -C -S -s : '1: :("++intercalate " " (concatMap modeNames modes)++")' '*::arg:->args'"
+                  modes -> ["_arguments -C -S -s : '1: :(("++modeDesc modes++"))' \\"
+                           ,"                      '*::arg:->args'"
                            ,""
                            ,"case \"$state\" in"
                            ,"  (args)"
@@ -55,7 +56,14 @@ zsh prog mode = hdr ++
                            ,"esac"]
 
   where
+    modeDesc modes = intercalate " " $ map (\m -> head (modeNames m) ++ "\\:" ++ esc (modeHelp m)) $ modes
     doMode m = ["      ("++head (modeNames m)++")"] ++ map ("        "++) (modeCompletion m) ++ ["      ;;"]
+    esc str = let eStr = concatMap (\c -> case c of
+                                            ':' -> "\\\\:"
+                                            '"' -> "\\\""
+                                            '\\' -> "\\\\"
+                                            _ -> [c]) str
+              in '"' : eStr ++ ['"']
     hdr = ["#compdef "++prog
           ,""
           ,"# zsh completion for '"++prog++"'"

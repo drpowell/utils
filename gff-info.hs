@@ -42,7 +42,7 @@ optProcess  = Process { file = Nothing &= typFile &= args
                       , update_ids = False &= help "Rename all feature IDs in the GFF"
                       , feature_prefix = "FID_" &= help "Prefix to use when renaming all feature IDs"
                       , remove_contigs = [] &= help "Remove these contigs (space separate contig names)"
-                      }
+                      } &= help "Perform some processing of the GFF file and output it"
 
 programOptions = cmdArgsMode $ modes [optStats, optCdsCheck, optProcess] &= program "gff-info"
 
