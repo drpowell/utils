@@ -268,7 +268,7 @@ withStdoutOrFile Nothing a        = a stdout
 withStdoutOrFile (Just outFile) a = withFile outFile WriteMode (\h -> putStrLn ("Writing to file : "++outFile) >> a h)
 
 main = do
-  --  zshMayOutputDef (cmdArgsMode options)
+  zshMayOutputDef programOptions
 
   opts <- cmdArgsRun programOptions
   ls <- lines <$> stdinOrFiles opts

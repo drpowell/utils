@@ -1,10 +1,10 @@
 module CmdArgs_zsh
     where
 
-import System.Console.CmdArgs.Explicit (flagHelp,flagNames,modeFlags,FlagInfo(..),flagInfo,flagType,modeArgs,argType,Mode)
+import System.Console.CmdArgs.Explicit
 import Data.List
 import Control.Applicative ((<$>))
-import System.Environment
+import System.Environment (getEnvironment)
 import System.Exit
 
 zshMayOutputDef mode = do env <- getEnvironment
@@ -15,18 +15,13 @@ zshMayOutputDef mode = do env <- getEnvironment
 
 
 zshCompletion :: Mode a -> IO ()
-zshCompletion mode = do p <- getProgName
-                        putStrLn . unlines . zsh p $ mode
+zshCompletion mode = do let [prog] = modeNames mode
+                        putStrLn . unlines . zsh prog $ mode
 
-zsh :: String -> Mode a -> [String]
-zsh prog mode = ["#compdef "++prog
-                ,""
-                ,"# zsh completion for '"++prog++"'"
-                ,"# To use, put this file somewhere in your $fpath and call it '_"++prog++"'"
-                ,""
-                ,"_arguments -C -S -s : \\"]
-                ++ optspecs ++
-                ["  && ret=0"]
+modeCompletion :: Mode a -> [String]
+modeCompletion mode = ["_arguments -C -S -s : \\"]
+                      ++ optspecs ++
+                      ["  && ret=0"]
   where
     optspecs = map def flags ++ finalArgs
     def f = "  "++mutuallyExclusive f ++ "{" ++ intercalate "," (asOpt f) ++ "}'["++flagHelp f++"]" ++ arg f ++ "' \\"
@@ -45,3 +40,25 @@ zsh prog mode = ["#compdef "++prog
                   Just "[FILE]" -> ["  '*:files:_files' \\"]
                   Just "FILE"   -> ["  '*:files:_files' \\"]
                   _ -> []
+
+zsh prog mode = hdr ++
+                case fromGroup $ modeGroupModes mode of
+                  [] -> modeCompletion mode
+                  modes -> ["_arguments -C -S -s : '1: :("++intercalate " " (concatMap modeNames modes)++")' '*::arg:->args'"
+                           ,""
+                           ,"case \"$state\" in"
+                           ,"  (args)"
+                           ,"    case \"$line[1]\" in"]
+                           ++ concatMap doMode modes ++
+                           ["    esac"
+                           ,"  ;;"
+                           ,"esac"]
+
+  where
+    doMode m = ["      ("++head (modeNames m)++")"] ++ map ("        "++) (modeCompletion m) ++ ["      ;;"]
+    hdr = ["#compdef "++prog
+          ,""
+          ,"# zsh completion for '"++prog++"'"
+          ,"# To use, put this file somewhere in your $fpath and call it '_"++prog++"'"
+          ,""
+          ]
