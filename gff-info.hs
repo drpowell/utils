@@ -27,6 +27,7 @@ data Options = Stats     { file :: Maybe FilePath }
              | CDS_Check { file :: Maybe FilePath }
              | Process   { file :: Maybe FilePath
                          , out :: Maybe FilePath
+                         , asFasta :: Bool
                          , update_ids :: Bool
                          , feature_prefix :: String
                          , remove_contigs :: [String]
@@ -39,6 +40,7 @@ optStats    = Stats     { file = Nothing &= typFile &= args } &= help "Output so
 optCdsCheck = CDS_Check { file = Nothing &= typFile &= args } &= help "Check if there are any overlapping CDS features"
 optProcess  = Process { file = Nothing &= typFile &= args
                       , out = Nothing &= help "Write GFF output to this file" &= typFile
+                      , asFasta = False &= help "In the GFF, append the sequence in fasta format after a ##FASTA tag.  If False, output in ##DNA at the start"
                       , update_ids = False &= help "Rename all feature IDs in the GFF"
                       , feature_prefix = "FID_" &= help "Prefix to use when renaming all feature IDs"
                       , remove_contigs = [] &= help "Remove these contigs (space separate contig names)"
@@ -124,15 +126,22 @@ featSeq gff f = case getScaffold gff (seq_id f) of
 parseGff :: [String] -> GFF
 parseGff ls = parseLines ls
 
-gffOutput :: GFF -> [String]
-gffOutput gff = ["##gff-version 3"]
-                ++ map (\s -> printf "##Type DNA %s" (s_name s)) (scaffolds gff)
-                ++ concatMap scaffoldOutput (scaffolds gff)
-                ++ map featureToLine (features gff)
+gffOutput :: Bool -> GFF -> [String]
+gffOutput asFasta gff = ["##gff-version 3"]
+                        ++ seqInline
+                        ++ map featureToLine (features gff)
+                        ++ seqAsFasta
   where
+    seqInline | asFasta = []
+              | otherwise = map (\s -> printf "##Type DNA %s" (s_name s)) (scaffolds gff)
+                            ++ concatMap scaffoldOutput (scaffolds gff)
+    seqAsFasta | asFasta = ["###","##FASTA"]
+                           ++ concatMap scaffoldAsFasta (scaffolds gff)
+               | otherwise = []
     scaffoldOutput s = [printf "##DNA %s" (s_name s)]
                        ++ map ("##"++) (toChunks 40 $ dna s)
                        ++ ["##end-DNA"]
+    scaffoldAsFasta s = (">"++s_name s) : (toChunks 60 $ dna s)
 
 toChunks _ [] = []
 toChunks n s = let (a,b) = splitAt n s
@@ -293,6 +302,7 @@ main = do
                                               ,case remove_contigs opts of {[] -> id ; cs -> removeContigs cs}
                                               ]
 
-       withStdoutOrFile (out opts) $ \h -> hPutStr h . unlines . gffOutput $ gff
+       withStdoutOrFile (out opts) $ \h ->
+           hPutStr h . unlines . gffOutput (asFasta opts) $ gff
 
 
