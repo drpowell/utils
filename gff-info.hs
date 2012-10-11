@@ -23,26 +23,28 @@ import System.Console.CmdArgs hiding (typ)
 import System.IO
 import CmdArgs_zsh
 
-data Options = Options { stats :: Bool
-                       , cds_overlap :: Bool
-                       , out :: Maybe FilePath
-                       , update_ids :: Bool
-                       , feature_prefix :: String
-                       , remove_contigs :: [String]
-                       , files :: [FilePath]
-                       } deriving (Show,Eq,Data,Typeable)
+data Options = Stats     { file :: Maybe FilePath }
+             | CDS_Check { file :: Maybe FilePath }
+             | Process   { file :: Maybe FilePath
+                         , out :: Maybe FilePath
+                         , update_ids :: Bool
+                         , feature_prefix :: String
+                         , remove_contigs :: [String]
+                         }
+               deriving (Show,Eq,Data,Typeable)
 
-options :: Options
-options = Options
-          { stats = True &= help "Output some stats about the GFF and its features"
-          , cds_overlap = False &= help "Check if there are any overlapping CDS features"
-          , out = Nothing &= help "Write GFF output to this file" &= typFile
-          , update_ids = False &= help "Rename all feature IDs in the GFF"
-          , feature_prefix = "FID_" &= help "Prefix to use when renaming all feature IDs"
-          , remove_contigs = [] &= help "Remove these contigs (space separate contig names)"
-          , files = [] &= args &= typFile
-          }
+--argFile = Nothing &= args &= typFile
 
+optStats    = Stats     { file = Nothing &= typFile &= args } &= help "Output some stats about the GFF and its features"
+optCdsCheck = CDS_Check { file = Nothing &= typFile &= args } &= help "Check if there are any overlapping CDS features"
+optProcess  = Process { file = Nothing &= typFile &= args
+                      , out = Nothing &= help "Write GFF output to this file" &= typFile
+                      , update_ids = False &= help "Rename all feature IDs in the GFF"
+                      , feature_prefix = "FID_" &= help "Prefix to use when renaming all feature IDs"
+                      , remove_contigs = [] &= help "Remove these contigs (space separate contig names)"
+                      }
+
+programOptions = cmdArgsMode $ modes [optStats, optCdsCheck, optProcess] &= program "gff-info"
 
 data GFF = GFF { scaffolds :: [Scaffold]
                , features :: [Feature]
@@ -258,31 +260,31 @@ formatInt x = h++t
 
 
 stdinOrFiles :: Options -> IO String
-stdinOrFiles opts | null (files opts) = putStrLn "Reading from stdin..." >> getContents
-                  | otherwise = concat <$> mapM readFile (files opts)
+stdinOrFiles opts = case file opts of
+                      Nothing -> putStrLn "Reading from stdin..." >> getContents
+                      Just f  -> readFile f -- concat <$> mapM readFile f
 
 withStdoutOrFile Nothing a        = a stdout
 withStdoutOrFile (Just outFile) a = withFile outFile WriteMode (\h -> putStrLn ("Writing to file : "++outFile) >> a h)
 
 main = do
-  zshMayOutputDef (cmdArgsMode options)
+  --  zshMayOutputDef (cmdArgsMode options)
 
-  opts <- cmdArgs options
+  opts <- cmdArgsRun programOptions
   ls <- lines <$> stdinOrFiles opts
 
-  when (not . null . remove_contigs $ opts) $
-    printf "Removing the following contigs : %s\n" (show $ remove_contigs opts)
   let origGff = parseGff ls
-  let gff = foldl' (\g f -> f g) origGff [if update_ids opts then setFeatureIDs (feature_prefix opts) else id
-                                         ,case remove_contigs opts of {[] -> id ; cs -> removeContigs cs}
-                                         ]
-  -- print . featSeq gff . head . features $ gff
 
-  when (stats opts) $ prStats gff
-  when (cds_overlap opts) $ overlappingCDS gff
+  case opts of
+    Stats _     -> prStats origGff
+    CDS_Check _ -> overlappingCDS origGff
+    Process { } -> do
+       when (not . null . remove_contigs $ opts) $
+            printf "Removing the following contigs : %s\n" (show $ remove_contigs opts)
+       let gff = foldl' (\g f -> f g) origGff [if update_ids opts then setFeatureIDs (feature_prefix opts) else id
+                                              ,case remove_contigs opts of {[] -> id ; cs -> removeContigs cs}
+                                              ]
 
-  case out opts of
-    Nothing -> return ()
-    Just file -> writeFile file . unlines . gffOutput $ gff
+       withStdoutOrFile (out opts) $ \h -> hPutStr h . unlines . gffOutput $ gff
 
 
