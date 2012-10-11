@@ -21,6 +21,7 @@ import Text.Regex.PCRE
 import Control.Monad.State
 import System.Console.CmdArgs hiding (typ)
 import System.IO
+import CmdArgs_zsh
 
 data Options = Options { stats :: Bool
                        , cds_overlap :: Bool
@@ -35,7 +36,7 @@ options :: Options
 options = Options
           { stats = True &= help "Output some stats about the GFF and its features"
           , cds_overlap = False &= help "Check if there are any overlapping CDS features"
-          , out = Nothing &= help "Write GFF output to this file"
+          , out = Nothing &= help "Write GFF output to this file" &= typFile
           , update_ids = False &= help "Rename all feature IDs in the GFF"
           , feature_prefix = "FID_" &= help "Prefix to use when renaming all feature IDs"
           , remove_contigs = [] &= help "Remove these contigs (space separate contig names)"
@@ -264,6 +265,8 @@ withStdoutOrFile Nothing a        = a stdout
 withStdoutOrFile (Just outFile) a = withFile outFile WriteMode (\h -> putStrLn ("Writing to file : "++outFile) >> a h)
 
 main = do
+  zshMayOutputDef (cmdArgsMode options)
+
   opts <- cmdArgs options
   ls <- lines <$> stdinOrFiles opts
 
@@ -281,3 +284,5 @@ main = do
   case out opts of
     Nothing -> return ()
     Just file -> writeFile file . unlines . gffOutput $ gff
+
+
