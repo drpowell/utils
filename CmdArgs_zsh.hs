@@ -48,16 +48,21 @@ zsh prog mode = hdr ++
                            ,"                      '*::arg:->args'"
                            ,""
                            ,"case \"$state\" in"
+                           ,"  ( )"]
+                           ++ indent 4 (modeCompletion mode) ++
+                           ["    ;;"
                            ,"  (args)"
                            ,"    case \"$line[1]\" in"]
                            ++ concatMap doMode modes ++
                            ["    esac"
-                           ,"  ;;"
+                           ,"    ;;"
                            ,"esac"]
 
   where
-    modeDesc modes = intercalate " " $ map (\m -> head (modeNames m) ++ "\\:" ++ esc (modeHelp m)) $ modes
-    doMode m = ["      ("++head (modeNames m)++")"] ++ map ("        "++) (modeCompletion m) ++ ["      ;;"]
+    indent n ls = map ((replicate n ' ')++) ls
+    modeName m = last (modeNames m)
+    modeDesc modes = intercalate " " $ map (\m -> modeName m ++ "\\:" ++ esc (modeHelp m)) $ modes
+    doMode m = indent 6 $ ["("++modeName m++")"] ++ indent 2 (modeCompletion m ++ [";;"])
     esc str = let eStr = concatMap (\c -> case c of
                                             ':' -> "\\\\:"
                                             '"' -> "\\\""

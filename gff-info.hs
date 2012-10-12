@@ -278,7 +278,7 @@ formatInt x = h++t
 
 stdinOrFiles :: Options -> IO String
 stdinOrFiles opts = case file opts of
-                      Nothing -> putStrLn "Reading from stdin..." >> getContents
+                      Nothing -> hPutStrLn stderr "Reading from stdin..." >> getContents
                       Just f  -> readFile f -- concat <$> mapM readFile f
 
 withStdoutOrFile Nothing a        = a stdout
@@ -293,9 +293,9 @@ main = do
   let origGff = parseGff ls
 
   case opts of
-    Stats _     -> prStats origGff
-    CDS_Check _ -> overlappingCDS origGff
-    Process { } -> do
+    Stats     {} -> prStats origGff
+    CDS_Check {} -> overlappingCDS origGff
+    Process   {} -> do
        when (not . null . remove_contigs $ opts) $
             printf "Removing the following contigs : %s\n" (show $ remove_contigs opts)
        let gff = foldl' (\g f -> f g) origGff [if update_ids opts then setFeatureIDs (feature_prefix opts) else id
