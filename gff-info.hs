@@ -46,7 +46,16 @@ optProcess  = Process { file = Nothing &= typFile &= args
                       , remove_contigs = [] &= help "Remove these contigs (space separate contig names)"
                       } &= help "Perform some processing of the GFF file and output it"
 
-programOptions = cmdArgsMode $ modes [optStats, optCdsCheck, optProcess] &= program "gff-info"
+programOptions =
+    cmdArgsMode $ modes [optStats, optCdsCheck, optProcess]
+    &= helpArg [explicit, name "h", name "help"]
+    &= program "gff-info"
+    &= summary "gff-info V1.0 (C) David R. Powell <david@drp.id.au>"
+    &= help "gff-info may be used to display some statistics about a GFF file.\n\
+            \Alternatively, it may also perform some processing on a GFF file\n\
+            \such as removing certain contigs, or setting new IDs on all the features\n\
+            \Currently supports GFF3 with sequences inline as '##DNA' or after '##FASTA'\n\
+            \"
 
 data GFF = GFF { scaffolds :: [Scaffold]
                , features :: [Feature]
