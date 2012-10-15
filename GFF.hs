@@ -1,8 +1,14 @@
 module GFF
     ( GFF(..), Scaffold(..), Feature(..), Seq
-    , parseGff, gffOutput, setFeatAttrib
+    , isGff3, parseGff, gffOutput, setFeatAttrib
+    , isFasta, parseFasta
     , featAttrib, featLen, featSel, featSeq, featId
     ) where
+
+{-
+  Reference for GFF3 : http://www.sequenceontology.org/gff3.shtml
+  Reference for GFF2 : http://www.sanger.ac.uk/resources/software/gff/spec.html#t_2
+-}
 
 import Data.Maybe
 import Text.Printf
@@ -60,19 +66,25 @@ parseScaffold (l:ls) = let name = tail (dropWhile (' ' /=) l)
                            (dnaLines,rest) = break ("##end-DNA" `isPrefixOf`) ls
                        in (Scaffold {s_name = name, dna = BS.pack $ concatMap (drop 2) dnaLines}
                           , rest)
-parseFastaScaffolds :: [String] -> [Scaffold]
-parseFastaScaffolds ls
+
+parseFasta :: [String] -> [Scaffold]
+parseFasta ls
     | null ls = []
     | ">" `isPrefixOf` head ls = let (dna,rest) = break (">" `isPrefixOf`) (tail ls)
                                  in Scaffold {s_name = tail (head ls), dna = BS.pack $ concat dna}
-                                        : parseFastaScaffolds rest
+                                        : parseFasta rest
     | otherwise = error $ "Bad FASTA section : "++show (take 5 ls)
+
+isFasta :: [String] -> Bool
+isFasta ls = case ls of
+               (l:_) -> ">" `isPrefixOf` l
+               _ -> False
 
 parseLines :: [String] -> GFF
 parseLines [] = GFF [] []
 parseLines lss@(l:ls)
     | "##DNA " `isPrefixOf` l = let (s,rem) = parseScaffold lss in addScaffold s (parseLines rem)
-    | "##FASTA" == l          = GFF (parseFastaScaffolds ls) []
+    | "##FASTA" == l          = GFF (parseFasta ls) []
     | "##" `isPrefixOf` l     = parseLines ls
     | otherwise               = addFeature (lineToFeature l) (parseLines ls)
   where
@@ -90,6 +102,11 @@ featSeq gff f = case getScaffold gff (seq_id f) of
 -- | TODO, should check ##gff-version
 parseGff :: [String] -> GFF
 parseGff ls = parseLines ls
+
+isGff3 :: [String] -> Bool
+isGff3 ls = case ls of
+              ("##gff-version 3":_) -> True
+              _ -> False
 
 gffOutput :: Bool -> GFF -> [String]
 gffOutput asFasta gff = ["##gff-version 3"]

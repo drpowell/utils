@@ -2,27 +2,15 @@
 
 {-# LANGUAGE DeriveDataTypeable,TupleSections #-}
 
-{-
-  Reference for GFF3 : http://www.sequenceontology.org/gff3.shtml
-  Reference for GFF2 : http://www.sanger.ac.uk/resources/software/gff/spec.html#t_2
--}
 
-
-
-import Control.Monad
-import Control.Applicative
-
-import Debug.Trace
-import Data.List
 import Data.List.Split
-import Data.Maybe
 import qualified Data.Map as M
-import Text.Printf
-import Text.Regex.PCRE
 import Control.Monad.State
 import System.Console.CmdArgs hiding (typ)
 import System.IO
 import qualified Data.ByteString.Char8 as BS
+
+import Useful
 import GFF
 import CmdArgs_zsh
 
@@ -37,8 +25,6 @@ data Options = Stats     { file :: Maybe FilePath }
                          }
                deriving (Show,Eq,Data,Typeable)
 
---argFile = Nothing &= args &= typFile
-
 optStats    = Stats     { file = Nothing &= typFile &= args } &= help "Output some stats about the GFF and its features" &= auto
 optCdsCheck = CDS_Check { file = Nothing &= typFile &= args } &= help "Check if there are any overlapping CDS features"
 optProcess  = Process { file = Nothing &= typFile &= args
@@ -52,12 +38,13 @@ optProcess  = Process { file = Nothing &= typFile &= args
 programOptions =
     cmdArgsMode $ modes [optStats, optCdsCheck, optProcess]
     &= helpArg [explicit, name "h", name "help"]
-    &= program "gff-info"
-    &= summary "gff-info V1.0 (C) David R. Powell <david@drp.id.au>"
-    &= help "gff-info may be used to display some statistics about a GFF file.\n\
-            \Alternatively, it may also perform some processing on a GFF file\n\
-            \such as removing certain contigs, or setting new IDs on all the features\n\
-            \Currently supports GFF3 with sequences inline as '##DNA' or after '##FASTA'\n"
+    &= program progName
+    &= summary (progName ++ " V1.0 (C) David R. Powell <david@drp.id.au>")
+    &= help (progName ++ " may be used to display some statistics about a GFF file.\n\
+             \Alternatively, it may also perform some processing on a GFF file\n\
+             \such as removing certain contigs, or setting new IDs on all the features\n\
+             \Currently supports GFF3 with sequences inline as '##DNA' or after '##FASTA'\n"
+            )
 
 overlap f1 f2 = let ov = overlapR (start f1,end f1) (start f2, end f2)
                     res = ov && strand f1 == strand f2
