@@ -49,10 +49,12 @@ OptionParser.new do |opts|
     end
 end.parse!
 
+in_file = ARGV.length>0 ? File.open(ARGV[0],'r') : $stdin
+
 #print options
 
 CSV($stdout, :col_sep => options[:out_sep]) do |out|
-    CSV($stdin, :headers => true, :return_headers=>true, :col_sep => options[:in_sep]) do |in_csv|
+    CSV(in_file, :headers => true, :return_headers=>true, :col_sep => options[:in_sep]) do |in_csv|
         in_csv.each do |line|
             l = []
             set=false
