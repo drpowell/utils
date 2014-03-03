@@ -2,6 +2,10 @@ module Genbank
     ( main
     ) where
 
+{-
+  Format definition: http://www.insdc.org/documents/feature_table.html
+-}
+
 import System.Environment
 import Control.Monad
 import Control.Applicative ((<$>),(<*>))
@@ -39,14 +43,15 @@ data Genbank = Genbank { hdr_ :: String
                        , seq_ :: String
                        } deriving (Show)
 
-parseGenbank :: Parser Genbank
-parseGenbank = do
-  r <- Genbank <$> header
-               <*> many tag
-               <*> features
-               <*> seq_origin
-  eof
-  return r
+genbank :: Parser [Genbank]
+genbank = many1 genbank_single
+
+genbank_single :: Parser Genbank
+genbank_single = do
+  Genbank <$> header
+          <*> many tag
+          <*> features
+          <*> seq_origin
 
 tr :: (Monad m) => String -> m ()
 tr m = trace m (return ())
@@ -197,12 +202,12 @@ check_cds_translation genbank = map check_feat $ feat_by_type "CDS" genbank
 main :: IO ()
 main = do
   (fname:_) <- getArgs
-  gb <- parseFromFile parseGenbank fname
+  gb <- parseFromFile genbank fname
   case gb of
     Left e -> error $ "Parse failed : "++show e
-    Right gb -> do print $ (last . take 6 . features_) gb
-                   print $ (take 100 . seq_) gb
-                   putStrLn $ unlines $ check_cds_translation gb
+    Right (gb:_) -> do print $ (last . take 6 . features_) gb
+                       print $ (take 100 . seq_) gb
+                       putStrLn $ unlines $ check_cds_translation gb
 
 
 
@@ -237,6 +242,7 @@ codons :: [(String, String)]
 codons =  map conv (coding_str =~ "(\\w{3})\\s(\\S+)" :: [[String]])
     where
       conv ([_,c,a]) = (c,a)
+      conv _ = error "Bad conv case"
 
 rna2prot :: String -> String
 rna2prot s = concatMap (\c -> fromMaybe (error $ "Unknown codon:"++c++":") $ lookup c codons)
