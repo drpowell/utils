@@ -2,8 +2,6 @@
 
 require 'find'
 
-raise "Requires ruby 1.9.x" if RUBY_VERSION !~ /^1.9/
-
 quiet = 1
 min_size = 1 * 1024 * 1024 * 1024  #1 GB
 min_saving = 500 * 1024 * 1024     #500MB
