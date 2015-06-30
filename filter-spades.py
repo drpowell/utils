@@ -22,6 +22,8 @@ def process(args):
     keep=True
     l1=0
     lengths=[]
+    if args.input == sys.stdin:
+        print("Reading from stdin...", file=sys.stderr)
     for l in args.input:
         if l[0] == '>':
             parts = l.split('_')
