@@ -3,8 +3,17 @@
 #include <string.h>
 #include <ctype.h>
 
+/*
+ *  gcc -Wall -O2 -std=c99 -o hack-depth hack-depth.c
+*/
+
+// Usage: samtools view bamFile.bam | hack-depth
+
 #define CONTIGLEN 1000000
-int depth[CONTIGLEN][5];
+// 5, to cover 4 bases + N
+#define NBASES 5
+int depth[CONTIGLEN][NBASES];
+int max_loc = 0;
 
 char dnaChar[] = "ATGCN";
 int char2int(char c) {
@@ -63,6 +72,7 @@ int main()
             depth[loc][char2int(*seq)]++;
             loc++;
             seq++;
+            max_loc = loc > max_loc ? loc : max_loc;
           }
           break;
       case 'H':
@@ -73,12 +83,18 @@ int main()
       }
     }
   }
-  for (int i=0; i<CONTIGLEN; i++) {
-    printf("%d : ",i);
+  // print header
+  printf("loc\t");
+  for (int j=0; j<NBASES; j++) {
+      printf("%c\t", dnaChar[j]);
+  }
+  printf("type\n");
+  for (int i=0; i<max_loc; i++) {
+    printf("%d\t",i);
     int total=0;
     int max=0;
-    for (int j=0; j<5; j++) {
-      printf("%c:%d ",dnaChar[j], depth[i][j]);
+    for (int j=0; j<NBASES; j++) {
+      printf("%d\t", depth[i][j]);
       total += depth[i][j];
       max = max>depth[i][j] ? max : depth[i][j];
     }
