@@ -7,7 +7,7 @@ output:
 
 This doc is hosted here : [http://drpowell.github.io/utils/pca-mds.html](http://drpowell.github.io/utils/pca-mds.html)
 
-PCA and Classical MDS are closely related.  PCA works from the original coordinate,  MDS works from a distance matrix.  If the distance matrix uses Euclidean distance, then a classical MDS and PCA produce the same projection.
+[PCA](https://en.wikipedia.org/wiki/Principal_component_analysis) and [Classical MDS](https://en.wikipedia.org/wiki/Multidimensional_scaling#Classical_multidimensional_scaling) are closely related.  PCA works from the original coordinates,  MDS works from a distance matrix.  If the distance matrix uses Euclidean distance, then a classical MDS and PCA produce the same projection.
 
 These R snippets show how to produce the same projection using PCA or MDS in R using `prcomp`, `princomp`, `cmdscale` or `svd`.
 
@@ -50,6 +50,8 @@ text(mds, labels=rownames(mds), ce=0.6)
 
 
 ### MDS Using SVD
+
+As implemented in [Degust](https://github.com/drpowell/degust/blob/master/degust-frontend/degust-src/js/mds-plot.vue#L86).
 
 ```{r}
 m <- scale(as.matrix(mtcars), center=T, scale=F)   # Columns are centered

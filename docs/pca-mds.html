@@ -1638,7 +1638,7 @@ summary {
 
 
 <p>This doc is hosted here : <a href="http://drpowell.github.io/utils/pca-mds.html">http://drpowell.github.io/utils/pca-mds.html</a></p>
-<p>PCA and Classical MDS are closely related. PCA works from the original coordinate, MDS works from a distance matrix. If the distance matrix uses Euclidean distance, then a classical MDS and PCA produce the same projection.</p>
+<p><a href="https://en.wikipedia.org/wiki/Principal_component_analysis">PCA</a> and <a href="https://en.wikipedia.org/wiki/Multidimensional_scaling#Classical_multidimensional_scaling">Classical MDS</a> are closely related. PCA works from the original coordinates, MDS works from a distance matrix. If the distance matrix uses Euclidean distance, then a classical MDS and PCA produce the same projection.</p>
 <p>These R snippets show how to produce the same projection using PCA or MDS in R using <code>prcomp</code>, <code>princomp</code>, <code>cmdscale</code> or <code>svd</code>.</p>
 <hr />
 <p>For this example, use the <code>mtcars</code> dataset. This is what it looks like</p>
@@ -1671,6 +1671,7 @@ text(mds, labels=rownames(mds), ce=0.6)</code></pre>
 </div>
 <div id="mds-using-svd" class="section level3">
 <h3>MDS Using SVD</h3>
+<p>As implemented in <a href="https://github.com/drpowell/degust/blob/master/degust-frontend/degust-src/js/mds-plot.vue#L86">Degust</a>.</p>
 <pre class="r"><code>m &lt;- scale(as.matrix(mtcars), center=T, scale=F)   # Columns are centered
 decomp &lt;- svd(m %*% t(m))
 proj &lt;- decomp$v %*% sqrt(diag(decomp$d))
