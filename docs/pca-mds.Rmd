@@ -1,0 +1,61 @@
+---
+title: "prcomp, princomp, cmdscale, svd"
+output:
+  html_document:
+    df_print: paged
+---
+
+This doc is hosted here : [http://drpowell.github.io/utils/pca-mds.html](http://drpowell.github.io/utils/pca-mds.html)
+
+PCA and Classical MDS are closely related.  PCA works from the original coordinate,  MDS works from a distance matrix.  If the distance matrix uses Euclidean distance, then a classical MDS and PCA produce the same projection.
+
+These R snippets show how to produce the same projection using PCA or MDS in R using `prcomp`, `princomp`, `cmdscale` or `svd`.
+
+---
+
+For this example, use the `mtcars` dataset.  This is what it looks like
+```{r}
+plot(mtcars)
+```
+
+### prcomp
+
+Really should scale=T for this type of data, but not the point of this exercise.
+
+```{r}
+pr1 <- prcomp(mtcars)
+plot(pr1$x, type='n')
+text(pr1$x, labels=rownames(pr1$x), ce=0.6)
+```
+
+### princomp
+
+```{r}
+pr2 <- princomp(mtcars)
+locs <- cbind(-pr2$scores[,1], pr2$scores[,2])          # Refections are arbitrary, swap one dimension to match previous plots
+plot(locs, type='n')
+text(locs, labels=rownames(pr2$scores), ce=0.6)
+```
+
+### MDS - cmdscale
+
+Compute distance matrix from euclidean distances.
+
+```{r}
+d <- dist(mtcars)
+mds <- cmdscale(d)
+plot(mds, type='n')
+text(mds, labels=rownames(mds), ce=0.6)
+```
+
+
+### MDS Using SVD
+
+```{r}
+m <- scale(as.matrix(mtcars), center=T, scale=F)   # Columns are centered
+decomp <- svd(m %*% t(m))
+proj <- decomp$v %*% sqrt(diag(decomp$d))
+proj[,2] <- -proj[,2]         # Refections are arbitrary, swap one dimension to match previous plots
+plot(proj, type='n')
+text(proj, labels=rownames(mtcars), ce=0.6)
+```
